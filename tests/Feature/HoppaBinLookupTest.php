@@ -2,6 +2,7 @@
 
 namespace XLaravel\Payline\BinLookup\Hoppa\Tests\Feature;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use XLaravel\Payline\BinLookup\Hoppa\HoppaBinLookup;
 use XLaravel\Payline\BinLookup\Hoppa\Tests\TestCase;
@@ -232,6 +233,36 @@ class HoppaBinLookupTest extends TestCase
         $this->fakeBin();
 
         $this->assertNull($this->provider->lookup('51015200')->scheme);
+    }
+
+    public function test_the_cache_holds_the_payload_rather_than_the_profile(): void
+    {
+        $this->fakeBin();
+
+        $this->provider->lookup('51015200');
+
+        $this->assertSame(
+            ['Card_Type' => 'CREDIT', 'Card_Family' => 'Bonus'],
+            Cache::get('payline:bin-lookup:hoppa:51015200'),
+        );
+    }
+
+    public function test_a_cached_payload_is_mapped_without_asking_again(): void
+    {
+        Cache::put('payline:bin-lookup:hoppa:51015200', [
+            'Card_Type' => 'DEBIT',
+            'Card_Family' => 'Paraf',
+            'Bank_Name' => 'HALKBANK',
+        ], 60);
+
+        Http::fake();
+
+        $profile = $this->provider->lookup('51015200');
+
+        $this->assertSame('paraf', $profile->family);
+        $this->assertSame(CardType::Debit, $profile->type);
+        $this->assertSame('HALKBANK', $profile->issuer);
+        Http::assertNothingSent();
     }
 
     public function test_a_resolved_profile_is_served_from_the_cache(): void

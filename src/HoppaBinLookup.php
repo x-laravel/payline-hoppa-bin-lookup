@@ -20,11 +20,15 @@ class HoppaBinLookup implements BinLookupProvider
 
     private const string CACHE_PREFIX = 'payline:bin-lookup:hoppa:';
 
+    private const int TIMEOUT = 5;
+
     private readonly string $baseUrl;
 
     private readonly int $cacheTtl;
 
     private readonly ?string $cacheStore;
+
+    private readonly int $timeout;
 
     public function __construct(array $config = [])
     {
@@ -33,6 +37,7 @@ class HoppaBinLookup implements BinLookupProvider
 
         $this->cacheTtl = (int) ($config['cache_ttl'] ?? self::CACHE_TTL);
         $this->cacheStore = $config['cache_store'] ?? null;
+        $this->timeout = (int) ($config['timeout'] ?? self::TIMEOUT);
     }
 
     public function lookup(string $bin): ?CardProfile
@@ -40,38 +45,44 @@ class HoppaBinLookup implements BinLookupProvider
         $bin = substr($bin, 0, 8);
 
         if ($this->cacheTtl <= 0) {
-            return $this->fetch($bin);
+            return $this->map($bin, $this->fetch($bin));
         }
 
         $cache = Cache::store($this->cacheStore);
         $key = self::CACHE_PREFIX . $bin;
         $cached = $cache->get($key);
 
-        if ($cached instanceof CardProfile) {
-            return $cached;
+        if (is_array($cached)) {
+            return $this->map($bin, $cached);
         }
 
-        $profile = $this->fetch($bin);
+        $body = $this->fetch($bin);
+        $profile = $this->map($bin, $body);
 
         if ($profile !== null) {
-            $cache->put($key, $profile, $this->cacheTtl);
+            $cache->put($key, $body, $this->cacheTtl);
         }
 
         return $profile;
     }
 
-    private function fetch(string $bin): ?CardProfile
+    private function fetch(string $bin): ?array
     {
-        $response = Http::post($this->baseUrl . '/api/services/EYVBinService', [
-            'CardNumber' => $bin,
-        ])->json();
+        $body = Http::timeout($this->timeout)
+            ->post($this->baseUrl . '/api/services/EYVBinService', ['CardNumber' => $bin])
+            ->json();
 
-        if (empty($response)) {
+        return is_array($body) ? $body : null;
+    }
+
+    private function map(string $bin, ?array $body): ?CardProfile
+    {
+        if (empty($body)) {
             return null;
         }
 
-        $family = mb_strtolower(trim((string) ($response['Card_Family'] ?? '')), 'UTF-8');
-        $type = CardType::parse($response['Card_Type'] ?? null);
+        $family = mb_strtolower(trim((string) ($body['Card_Family'] ?? '')), 'UTF-8');
+        $type = CardType::parse($body['Card_Type'] ?? null);
 
         if ($family === '' && $type === null) {
             return null;
@@ -79,14 +90,14 @@ class HoppaBinLookup implements BinLookupProvider
 
         return new CardProfile(
             bin: $bin,
-            scheme: CardScheme::parse($response['Bank_Brand'] ?? null),
+            scheme: CardScheme::parse($body['Bank_Brand'] ?? null),
             type: $type,
-            category: $this->category($response['Card_Kind'] ?? null),
+            category: $this->category($body['Card_Kind'] ?? null),
             family: $family === '' ? null : $family,
-            issuer: $this->text($response['Bank_Name'] ?? null),
-            issuerCode: $this->text($response['Bank_Code'] ?? null),
+            issuer: $this->text($body['Bank_Name'] ?? null),
+            issuerCode: $this->text($body['Bank_Code'] ?? null),
             source: 'hoppa',
-            raw: $response,
+            raw: $body,
         );
     }
 

@@ -28,6 +28,6 @@ class TestCase extends Orchestra
         $app['config']->set('cache.default', 'array');
 
         $app['config']->set('payline.test_mode', true);
-        $app['config']->set('payline.bin_lookup.default', 'hoppa');
+        $app['config']->set('payline.bin_lookup.providers', ['hoppa']);
     }
 }
