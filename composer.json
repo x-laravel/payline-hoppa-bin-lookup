@@ -1,0 +1,38 @@
+{
+    "name": "x-laravel/payline-hoppa-bin-lookup",
+    "description": "Hoppa BIN lookup provider for x-laravel/payline",
+    "keywords": ["laravel", "payment", "hoppa", "bin"],
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "illuminate/http": "^12.0|^13.0",
+        "illuminate/support": "^12.0|^13.0",
+        "x-laravel/payline": "dev-master"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^10.0|^11.0",
+        "phpunit/phpunit": "^11.0|^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "XLaravel\\Payline\\BinLookup\\Hoppa\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "XLaravel\\Payline\\BinLookup\\Hoppa\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "XLaravel\\Payline\\BinLookup\\Hoppa\\HoppaBinLookupServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "minimum-stability": "stable"
+}
